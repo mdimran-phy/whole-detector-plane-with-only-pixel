@@ -1,0 +1,235 @@
+ //whole detector plane with pixels and only 1 pmt
+ 
+ if (fMcpLayout == 3) {
+    // one mcp layout
+    // one mcp layout
+    G4Box *gMcp = new G4Box("gMcp", 0.5 * fPrizm[2], 0.5 * fPrizm[0], 0.5 * fMcpTotal[2]);
+    lMcp = new G4LogicalVolume(gMcp, BarMaterial, "lMcp", 0, 0, 0);
+
+    double pixSize = 3 * mm;
+
+    fNpix1 = (int)(fPrizm[2] / pixSize); //x
+    fNpix2 = (int)(fPrizm[0] / pixSize); //y
+    fRun->setNpix(fNpix1 * fNpix2);
+    fRun->setTest2(fNpix1);
+    fRun->setNpmt(1);
+    double detector_size_x = fNpix1 * pixSize;  // = fPrizm[2]
+    double detector_size_y = fNpix2 * pixSize;  // = fPrizm[0]
+    std::cout << "Number of pixels =" << fNpix1 * fNpix2 << "  pixel's size = " << pixSize << std::endl;
+    std::cout << "Total detector plane size: " << detector_size_x/mm << " mm × " << detector_size_y/mm << " mm" << std::endl;
+    
+    std::cout << "Pixel layout (geometry): " << std::endl;
+    std::cout << "  Along X (columns) = " << fNpix1 << std::endl;
+    std::cout << "  Along Y (rows)    = " << fNpix2 << std::endl;
+    std::cout << "  Total pixels      = " << fNpix1 * fNpix2 << std::endl;
+    int pixId = 0;
+    G4Box *gPixel = new G4Box("gPixel", 0.5 * pixSize, 0.5 * pixSize, 0.01);
+    lPixel = new G4LogicalVolume(gPixel, BarMaterial, "lPixel", 0, 0, 0); 
+    /*for (int i = 0; i < fNpix1; i++) {
+      for (int j = 0; j < fNpix2; j++) {
+        double shiftx = (i + 0.5) * pixSize - 0.5 * fPrizm[2];
+        double shifty = (j + 0.5) * pixSize - 0.5 * fPrizm[0];
+        new G4PVPlacement(fdRot, G4ThreeVector(shiftx, shifty, 0), lPixel, "wPixel", lMcp, false,
+                          pixId++); */
+      // 1 PMT whole plane                    
+      for (int i = 0; i < fNpix1; i++) {
+      for (int j = 0; j < fNpix2; j++) {
+    int pixId = j * fNpix1 + i; // 👈 critical fix for consistency
+    double shiftx = (i + 0.5) * pixSize - 0.5 * fPrizm[2];
+    double shifty = (j + 0.5) * pixSize - 0.5 * fPrizm[0];
+    new G4PVPlacement(fdRot, G4ThreeVector(shiftx, shifty, 0), lPixel, "wPixel", lMcp, false,
+                      pixId); 
+   }   
+   } 
+    
+    new G4PVPlacement(0, G4ThreeVector(0, 0, 0), lMcp, "wMcp", lFd, false, 0);
+  }
+  
+  
+  In PrtTools.cxx:
+  
+  void PrtTools::init_digi() {
+   int fNpix1 = _run->getTest2();
+  int fNpix2 = _npix / fNpix1;
+
+  for (int m = 0; m < _npmt; m++) {
+    if (_hdigi[m]) {
+      _hdigi[m]->Reset("M");
+    } else {
+      _hdigi[m] = new TH2F(Form("pmt%d", m), Form("pmt%d", m), fNpix2, 0, fNpix2, fNpix1, 0, fNpix1);
+      _hdigi[m]->SetStats(0);
+      _hdigi[m]->SetTitle(0);
+      // _hdigi[m]->GetXaxis()->SetNdivisions(((nrow > 10) ? 20 : 10));
+      // _hdigi[m]->GetYaxis()->SetNdivisions(((nrow > 10) ? 20 : 10));
+     // _hdigi[m]->GetXaxis()->SetNdivisions(nrow);
+     // _hdigi[m]->GetYaxis()->SetNdivisions(nrow);
+      _hdigi[m]->GetXaxis()->SetNdivisions(fNpix1);
+      _hdigi[m]->GetYaxis()->SetNdivisions(fNpix2);
+      _hdigi[m]->GetXaxis()->SetLabelOffset(100);
+      _hdigi[m]->GetYaxis()->SetLabelOffset(100);
+      _hdigi[m]->GetXaxis()->SetTickLength(1);
+      _hdigi[m]->GetYaxis()->SetTickLength(1);
+      _hdigi[m]->GetXaxis()->SetAxisColor(15);
+      _hdigi[m]->GetYaxis()->SetAxisColor(15);
+    }
+  }
+}
+
+
+void PrtTools::fill_digi(int pmt, int pix, double w){
+
+int fNpix1 = _run->getTest2();
+  int fNpix2 = _npix / fNpix1;
+  int ix = pix % fNpix1;
+  int iy = pix / fNpix1;
+
+  if (pmt < _npmt) {
+    if (_run->getGeometry() == 2)
+      _hdigi[pmt]->Fill(ix, iy, w);
+    else
+      _hdigi[pmt]->Fill(iy, ix, w);
+  }
+}
+
+
+
+// Full pixalated pmt with 28.25 mm gap first and last
+
+if (fMcpLayout == 3) {
+    // one mcp layout
+    G4Box *gMcp = new G4Box("gMcp", 0.5 * fPrizm[2], 0.5 * fPrizm[0], 0.5 * fMcpTotal[2]);
+    lMcp = new G4LogicalVolume(gMcp, BarMaterial, "lMcp", 0, 0, 0);
+
+    double pixSize = 3 * mm;
+
+    fNpix1 = (int)(fPrizm[2] / pixSize); //x
+    fNpix2 = (int)(fPrizm[0] / pixSize); //y
+    fRun->setNpix(fNpix1 * fNpix2);
+    fRun->setTest2(fNpix1);
+    fRun->setNpmt(1);
+    double detector_size_x = fNpix1 * pixSize;  // = fPrizm[2]
+    double detector_size_y = fNpix2 * pixSize;  // = fPrizm[0]
+    std::cout << "Number of pixels =" << fNpix1 * fNpix2 << "  pixel's size = " << pixSize << std::endl;
+    std::cout << "Total detector plane size: " << detector_size_x/mm << " mm × " << detector_size_y/mm << " mm" << std::endl;
+    
+    std::cout << "Pixel layout (geometry): " << std::endl;
+    std::cout << "  Along X (columns) = " << fNpix1 << std::endl;
+    std::cout << "  Along Y (rows)    = " << fNpix2 << std::endl;
+    std::cout << "  Total pixels      = " << fNpix1 * fNpix2 << std::endl;
+    int pixId = 0;
+    G4Box *gPixel = new G4Box("gPixel", 0.5 * pixSize, 0.5 * pixSize, 0.01);
+    lPixel = new G4LogicalVolume(gPixel, BarMaterial, "lPixel", 0, 0, 0); 
+     double yEdgeCut = 28.25 * mm;
+    int activePixelCount = 0;
+    int inactivePixelCount = 0;
+
+for (int i = 0; i < fNpix1; i++) {
+ for (int j = 0; j <fNpix2; j++) {
+  double y_center = (j + 0.5) * pixSize - 0.5 * fPrizm[0]; // y-center of pixel
+
+  if (std::abs(y_center) > 0.5 * fPrizm[0] - yEdgeCut) {
+    // Skip pixels in edge region
+    inactivePixelCount++;
+    continue;
+  }
+
+ // for (int j = 0; j < fNpix2; j++) {
+    int pixId = j * fNpix1 + i;
+    double shiftx = (i + 0.5) * pixSize - 0.5 * fPrizm[2];
+    //double shifty = (j + 0.5) * pixSize - 0.5 * fPrizm[0];
+    double shifty = y_center;
+    new G4PVPlacement(fdRot, G4ThreeVector(shiftx, shifty, 0),
+                      lPixel, "wPixel", lMcp, false, pixId);
+    activePixelCount++;
+  }
+}
+
+   std::cout << "Deactivated edge pixels along Y: ±" << yEdgeCut / mm << " mm" << std::endl;
+   std::cout << "  Active pixels:   " << activePixelCount << std::endl;
+   std::cout << "  Inactive pixels: " << inactivePixelCount << std::endl;                                  
+      
+    
+    
+    new G4PVPlacement(0, G4ThreeVector(0, 0, 0), lMcp, "wMcp", lFd, false, 0);
+    
+    }
+    
+    
+    void PrtTools::init_digi() {
+  // Use pixel size consistent with construction
+  double pixSize = 3.0;  // mm per pixel
+
+  // Get pixel counts from simulation run parameters
+  int fNpix1 = _run->getTest2();  // number of pixels along X (columns)
+  int fNpix2 = _npix / fNpix1;    // number of pixels along Y (rows)
+
+  double detector_size_x = fNpix2 * pixSize;
+  double detector_size_y = fNpix1 * pixSize;
+
+  // We have only one MCP in this layout
+  _npmt = 1;
+
+  for (int m = 0; m < _npmt; m++) {
+    if (_hdigi[m]) {
+      _hdigi[m]->Reset("M");
+    } else {
+      _hdigi[m] = new TH2F(Form("pmt%d", m), Form("pmt%d", m),
+                           fNpix2, 0, detector_size_x,     // X axis in mm
+                           fNpix1, 0, detector_size_y);    // Y axis in mm
+
+      _hdigi[m]->SetStats(0);
+      _hdigi[m]->SetTitle("");
+
+      _hdigi[m]->GetXaxis()->SetNdivisions(fNpix2);
+      _hdigi[m]->GetYaxis()->SetNdivisions(fNpix1);
+
+      _hdigi[m]->GetXaxis()->SetLabelOffset(100);
+      _hdigi[m]->GetYaxis()->SetLabelOffset(100);
+
+      _hdigi[m]->GetXaxis()->SetTickLength(1);
+      _hdigi[m]->GetYaxis()->SetTickLength(1);
+
+      _hdigi[m]->GetXaxis()->SetAxisColor(15);
+      _hdigi[m]->GetYaxis()->SetAxisColor(15);
+    }
+  }
+}
+
+void PrtTools::fill_digi(int pmt, int pix, double w) {
+  if (pmt >= _npmt) {
+    std::cerr << "Warning: PMT index " << pmt << " out of bounds (max " << _npmt-1 << ")\n";
+    return;
+  }
+
+  int fNpix1 = _run->getTest2();
+  int fNpix2 = _npix / fNpix1;
+
+  int ix = pix % fNpix1;  // pixel X index (column)
+  int iy = pix / fNpix1;  // pixel Y index (row)
+
+  double pixSize = 3.0;   // mm per pixel
+  double y_center = (ix + 0.5) * pixSize;
+
+  // Skip pixels in inactive edge region ±28.25 mm at edges along Y
+  if (y_center < 28.25 || y_center > (fNpix2 * pixSize - 28.25)) {
+    return;
+  }
+
+  // Fill histogram with weight w at physical pixel coordinates
+  double x_pos = (iy + 0.5) * pixSize;
+  double y_pos = y_center;
+
+  _hdigi[pmt]->Fill(x_pos, y_pos, w);
+
+  // Debug print for hits in first row
+  if (ix == 0) {
+    std::cout << "Hit pixel in first row: pix = " << pix
+              << ", ix = " << ix << ", iy = " << iy
+              << ", w = " << w << std::endl;
+  }
+}
+
+
+
+  
+  
