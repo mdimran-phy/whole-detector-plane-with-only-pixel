@@ -231,5 +231,138 @@ void PrtTools::fill_digi(int pmt, int pix, double w) {
 
 
 
+
+
+
+
+
+PrtDetectorConstruction.cxx:
+  if (fMcpLayout == 3) {
+  // One MCP layout with 6 inactive horizontal gaps
+  G4Box *gMcp = new G4Box("gMcp", 0.5 * fPrizm[2], 0.5 * fPrizm[0], 0.5 * fMcpTotal[2]);
+  lMcp = new G4LogicalVolume(gMcp, BarMaterial, "lMcp", 0, 0, 0);
+
+  double pixSize = 3 * mm;
+
+  fNpix1 = static_cast<int>(fPrizm[2] / pixSize); // X (columns)
+  fNpix2 = static_cast<int>(fPrizm[0] / pixSize); // Y (rows)
+  fRun->setNpix(fNpix1 * fNpix2);
+  fRun->setTest2(fNpix1);
+  fRun->setNpmt(1);
+
+  double detector_size_x = fNpix1 * pixSize;
+  double detector_size_y = fNpix2 * pixSize;
+
+  std::cout << "Number of pixels = " << fNpix1 * fNpix2 << ", pixel size = " << pixSize / mm << " mm" << std::endl;
+  std::cout << "Total detector plane size: " << detector_size_x / mm << " mm × " << detector_size_y / mm << " mm" << std::endl;
+  std::cout << "Pixel layout (geometry):\n"
+            << "  Along X (columns) = " << fNpix1 << "\n"
+            << "  Along Y (rows)    = " << fNpix2 << "\n"
+            << "  Total pixels      = " << fNpix1 * fNpix2 << std::endl;
+
+  G4Box *gPixel = new G4Box("gPixel", 0.5 * pixSize, 0.5 * pixSize, 0.01);
+  lPixel = new G4LogicalVolume(gPixel, BarMaterial, "lPixel", 0, 0, 0);
+
+  // Define layout: 5 active PMT regions separated by 6 gaps (each 9 mm)
+  int numPmts = 5;
+  int numGaps = 6;
+  double gapHeight = 9.0 * mm;
+  double totalGapY = numGaps * gapHeight;
+  double activeY = detector_size_y - totalGapY;
+  double pmtHeight = activeY / numPmts;
+
+  std::vector<std::pair<double, double>> activeYRegions;
+  double yCursor = -0.5 * detector_size_y;
+
+  for (int i = 0; i < numGaps; ++i) {
+    yCursor += gapHeight;
+    if (i < numPmts) {
+      double yStart = yCursor;
+      double yEnd = yStart + pmtHeight;
+      activeYRegions.emplace_back(yStart, yEnd);
+      yCursor = yEnd;
+    }
+  }
+
+  int pixId = 0;
+  int activePixelCount = 0, inactivePixelCount = 0;
+
+  for (int ix = 0; ix < fNpix1; ++ix) {
+    double shiftx = (ix + 0.5) * pixSize - 0.5 * detector_size_x;
+    for (int iy = 0; iy < fNpix2; ++iy) {
+      double shifty = (iy + 0.5) * pixSize - 0.5 * detector_size_y;
+
+      bool inActiveRegion = false;
+      for (const auto& [ymin, ymax] : activeYRegions) {
+        if (shifty >= ymin && shifty < ymax) {
+          inActiveRegion = true;
+          break;
+        }
+      }
+
+      if (!inActiveRegion) {
+        inactivePixelCount++;
+        continue;
+      }
+
+      int pix = iy * fNpix1 + ix;
+      new G4PVPlacement(fdRot, G4ThreeVector(shiftx, shifty, 0), lPixel, "wPixel", lMcp, false, pix);
+      activePixelCount++;
+    }
+  }
+
+  std::cout << "Deactivated pixels in 6 gap regions along Y (total "
+            << gapHeight / mm << " mm × 6 = " << totalGapY / mm << " mm):" << std::endl;
+  std::cout << "  Active pixels:   " << activePixelCount << std::endl;
+  std::cout << "  Inactive pixels: " << inactivePixelCount << std::endl;
+
+  new G4PVPlacement(0, G4ThreeVector(0, 0, 0), lMcp, "wMcp", lFd, false, 0);
+}
+
+
+
+PrtTools.cxx:
+
+// One MCP layout with 6 inactive horizontal gaps
+void PrtTools::init_digi() {
+  int fNpix1 = _run->getTest2();
+  int fNpix2 = _npix / fNpix1;
+
+  for (int m = 0; m < _npmt; ++m) {
+    if (_hdigi[m]) {
+      _hdigi[m]->Reset("M");
+    } else {
+      _hdigi[m] = new TH2F(Form("pmt%d", m), Form("pmt%d", m), fNpix2, 0, fNpix2, fNpix1, 0, fNpix1);
+      _hdigi[m]->SetStats(0);
+      _hdigi[m]->SetTitle(0);
+      _hdigi[m]->GetXaxis()->SetNdivisions(fNpix1);
+      _hdigi[m]->GetYaxis()->SetNdivisions(fNpix2);
+      _hdigi[m]->GetXaxis()->SetLabelOffset(100);
+      _hdigi[m]->GetYaxis()->SetLabelOffset(100);
+      _hdigi[m]->GetXaxis()->SetTickLength(1);
+      _hdigi[m]->GetYaxis()->SetTickLength(1);
+      _hdigi[m]->GetXaxis()->SetAxisColor(15);
+      _hdigi[m]->GetYaxis()->SetAxisColor(15);
+    }
+  }
+}
+// One MCP layout with 6 inactive horizontal gaps
+void PrtTools::fill_digi(int pmt, int pix, double w) {
+  int fNpix1 = _run->getTest2();  // X direction
+  int fNpix2 = _npix / fNpix1;    // Y direction
+
+  int ix = pix % fNpix1;
+  int iy = pix / fNpix1;
+
+  if (pmt < _npmt) {
+    if (_run->getGeometry() == 2)
+      _hdigi[pmt]->Fill(ix, iy, w);
+    else
+      _hdigi[pmt]->Fill(iy, ix, w);
+  }
+}
+
+
+
   
   
